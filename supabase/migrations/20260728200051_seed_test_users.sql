@@ -18,6 +18,9 @@ GoTrue accepts these hashes in encrypted_password.
 - All three get 'authenticated' role.
 */
 
+-- Enable pgcrypto for gen_salt() / crypt()
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 DO $$
 DECLARE
   u record;
