@@ -18,8 +18,8 @@ GoTrue accepts these hashes in encrypted_password.
 - All three get 'authenticated' role.
 */
 
--- Enable pgcrypto for gen_salt() / crypt()
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- pgcrypto is pre-installed in the 'extensions' schema on Supabase Cloud
+-- Use fully-qualified names: extensions.gen_salt() / extensions.crypt()
 
 DO $$
 DECLARE
@@ -29,9 +29,9 @@ DECLARE
 BEGIN
   FOR u IN
     SELECT * FROM (VALUES
-      ('creator@vaultstream.dev', crypt('creator123', gen_salt('bf', 10)), 'Content Creator', 'creator'),
-      ('viewer@vaultstream.dev',  crypt('viewer123',  gen_salt('bf', 10)), 'Casual Viewer',  'viewer'),
-      ('admin@vaultstream.dev',   crypt('admin123',   gen_salt('bf', 10)), 'Platform Admin',  'admin')
+      ('creator@vaultstream.dev', extensions.crypt('creator123', extensions.gen_salt('bf', 10)), 'Content Creator', 'creator'),
+      ('viewer@vaultstream.dev',  extensions.crypt('viewer123',  extensions.gen_salt('bf', 10)), 'Casual Viewer',  'viewer'),
+      ('admin@vaultstream.dev',   extensions.crypt('admin123',   extensions.gen_salt('bf', 10)), 'Platform Admin',  'admin')
     ) AS t(email, enc_pass, name, role)
   LOOP
     -- check if user already exists

@@ -14,12 +14,13 @@ plus one public folder with a couple public videos so the viewer account
 
 ## 2. Idempotent
 Uses ON CONFLICT DO NOTHING so re-running won't duplicate.
+User IDs are looked up dynamically by email to avoid hardcoded UUID issues.
 */
 
 DO $$
 DECLARE
-  creator_id uuid := 'ba00ce1f-e8cc-4014-8001-ebcc60fa4eda';
-  viewer_id  uuid := '557c20dd-d1f6-477c-83ae-84e46714daeb';
+  creator_id uuid;
+  viewer_id  uuid;
   travel_folder uuid;
   drafts_folder uuid;
   featured_folder uuid;
@@ -29,6 +30,15 @@ DECLARE
   im1 uuid; im2 uuid;
   vv1 uuid;
 BEGIN
+  -- Look up user IDs dynamically by email (set by seed_test_users migration)
+  SELECT id INTO creator_id FROM auth.users WHERE email = 'creator@vaultstream.dev' LIMIT 1;
+  SELECT id INTO viewer_id  FROM auth.users WHERE email = 'viewer@vaultstream.dev'  LIMIT 1;
+
+  IF creator_id IS NULL OR viewer_id IS NULL THEN
+    RAISE NOTICE 'Seed users not found — skipping sample content seed';
+    RETURN;
+  END IF;
+
   -- ---------- creator folders ----------
   INSERT INTO folders (id, owner_id, name, privacy)
   VALUES (gen_random_uuid(), creator_id, 'Travel Vlogs', 'public')
@@ -140,12 +150,12 @@ BEGIN
 
   -- ---------- creator activity ----------
   INSERT INTO activity (user_id, type, message, created_at) VALUES
-    (creator_id, 'upload',      'Uploaded video "Sunset Over Santorini"',   now() - interval '6 days'),
-    (creator_id, 'upload',      'Uploaded video "Tokyo Street Food Tour"',   now() - interval '5 days'),
-    (creator_id, 'folder_shared', 'Shared folder "Featured Content"',         now() - interval '8 days'),
-    (creator_id, 'clone',       'Cloned video from external link',            now() - interval '3 days'),
-    (creator_id, 'upload',      'Uploaded video "Product Demo — Wireless Earbuds"', now() - interval '3 days'),
-    (creator_id, 'privacy_changed', 'Made "Product Demo" public',             now() - interval '2 days')
+    (creator_id, 'upload',        'Uploaded video "Sunset Over Santorini"',              now() - interval '6 days'),
+    (creator_id, 'upload',        'Uploaded video "Tokyo Street Food Tour"',              now() - interval '5 days'),
+    (creator_id, 'folder_shared', 'Shared folder "Featured Content"',                     now() - interval '8 days'),
+    (creator_id, 'clone',         'Cloned video from external link',                      now() - interval '3 days'),
+    (creator_id, 'upload',        'Uploaded video "Product Demo — Wireless Earbuds"',     now() - interval '3 days'),
+    (creator_id, 'privacy_changed','Made "Product Demo" public',                          now() - interval '2 days')
   ON CONFLICT DO NOTHING;
 
   -- ---------- viewer content ----------
