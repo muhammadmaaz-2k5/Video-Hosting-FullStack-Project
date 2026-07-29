@@ -21,7 +21,7 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const expiry = Math.floor(Date.now() / 1000) + 2400; // 40 minutes
+  const expiry = Math.floor(Date.now() / 1000) + 1200; // 20 minutes
   const token = crypto.randomUUID();
 
   // Signature = HMAC-SHA1(PRIVATE_KEY, expiry + token)
