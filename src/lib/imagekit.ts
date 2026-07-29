@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 const urlEndpoint = import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT;
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
@@ -21,9 +23,14 @@ export function uploadToImageKit(
   onProgress: (pct: number) => void,
 ): Promise<{ url: string | null; result: ImageKitUploadResult | null; error: string | null }> {
   // 1. Get signed auth params from Edge Function
-  return fetch(`${supabaseUrl}/functions/v1/imagekit-auth`, {
-    headers: { apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string },
-  })
+  return supabase.auth.getSession().then(({ data: { session } }) =>
+    fetch(`${supabaseUrl}/functions/v1/imagekit-auth`, {
+      headers: {
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+        Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY as string}`,
+      },
+    })
+  )
     .then((res) => {
       if (!res.ok) throw new Error(`Auth failed (${res.status})`);
       return res.json() as Promise<{ publicKey: string; token: string; expiry: number; signature: string }>;
