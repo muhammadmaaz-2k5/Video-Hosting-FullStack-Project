@@ -28,7 +28,12 @@ export function cldUrl(
   height: number,
 ): string {
   if (!src) return '';
+  // Already a Cloudinary URL — pass through
   if (src.includes('res.cloudinary.com')) return src;
+  // Supabase storage URLs — use directly, Cloudinary can't proxy auth-gated storage
+  if (src.includes('.supabase.co/storage/')) return src;
+  // Data URIs — use directly
+  if (src.startsWith('data:')) return src;
   const c = getCld();
   const img = c
     .image(src)
