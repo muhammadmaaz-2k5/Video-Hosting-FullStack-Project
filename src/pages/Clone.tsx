@@ -124,6 +124,12 @@ export function Clone() {
         srcRecord = data;
       }
 
+      // If it's an internal link but we couldn't fetch the source, fail
+      if (p.id && !srcRecord) {
+        update(itemId, { status: 'failed' });
+        continue;
+      }
+
       await sleep(700);
       update(itemId, { status: 'processing', progress: 40 });
 
