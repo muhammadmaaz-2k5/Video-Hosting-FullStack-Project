@@ -116,8 +116,21 @@ export function Clone() {
       await sleep(400);
       update(itemId, { status: 'fetching', progress: 15 });
 
+      // If cloning from an internal embed/folder link, fetch the source record
+      let srcRecord: Record<string, unknown> | null = null;
+      if (p.id) {
+        const table = isImage ? 'images' : 'videos';
+        const { data } = await supabase.from(table).select('*').eq('id', p.id).maybeSingle();
+        srcRecord = data;
+      }
+
       await sleep(700);
       update(itemId, { status: 'processing', progress: 40 });
+
+      const srcTitle = (srcRecord?.title as string) || p.raw.split('/').pop() || 'Untitled';
+      const srcSize = (srcRecord?.size_bytes as number) ?? 0;
+      const srcPath = (srcRecord?.storage_path as string) || p.raw;
+      const srcContentType = (srcRecord?.content_type as string) || (isImage ? 'image/jpeg' : 'video/mp4');
 
       let row: { id: string } | null = null;
       let dbErr = null;
@@ -126,11 +139,11 @@ export function Clone() {
         const res = await supabase.from('images').insert({
             owner_id: user.id,
             folder_id: targetFolderId,
-            title: 'Cloned image',
-            storage_path: p.raw,
-            size_bytes: 0,
-            content_type: 'image/jpeg',
-            thumbnail_url: p.raw,
+            title: `Clone of ${srcTitle}`,
+            storage_path: srcPath,
+            size_bytes: srcSize,
+            content_type: srcContentType,
+            thumbnail_url: (srcRecord?.thumbnail_url as string) || srcPath,
             status: 'processing',
             privacy: 'private',
           }).select().single();
@@ -140,11 +153,11 @@ export function Clone() {
         const res = await supabase.from('videos').insert({
             owner_id: user.id,
             folder_id: targetFolderId,
-            title: 'Cloned video',
-            storage_path: p.raw,
-            size_bytes: 0,
-            content_type: 'video/mp4',
-            poster_url: cldPoster(posterFor(i)),
+            title: `Clone of ${srcTitle}`,
+            storage_path: srcPath,
+            size_bytes: srcSize,
+            content_type: srcContentType,
+            poster_url: (srcRecord?.poster_url as string) || cldPoster(posterFor(i)),
             status: 'processing',
             privacy: 'private',
             cloned_from: p.id ?? null,
@@ -170,7 +183,7 @@ export function Clone() {
       await supabase.from('activity').insert({
         user_id: user.id,
         type: 'clone',
-        message: `Cloned ${isImage ? 'image' : 'video'} from link`,
+        message: `Cloned ${isImage ? 'image' : 'video'} "${srcTitle}"`,
       });
     }
 
