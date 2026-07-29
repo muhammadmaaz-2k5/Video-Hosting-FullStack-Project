@@ -10,7 +10,6 @@ interface Props {
   videoId: string;
   videoSrc?: string | null;
   poster?: string | null;
-  title: string;
 }
 
 /**
@@ -24,7 +23,7 @@ interface Props {
  *  - Supabase Realtime Presence tracking (live viewer count)
  *  - view_events INSERT + increment_video_view_count RPC
  */
-export function VideoPlayer({ videoId, videoSrc, poster, title }: Props) {
+export function VideoPlayer({ videoId, videoSrc, poster }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const artRef = useRef<Artplayer | null>(null);
   const sessionIdRef = useRef<string>(uuid());
@@ -122,8 +121,7 @@ export function VideoPlayer({ videoId, videoSrc, poster, title }: Props) {
       artRef.current?.destroy(false);
       artRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoId]);
+  }, [videoId, videoSrc, poster]);
 
   // If the src changes (e.g. same page navigation) update the player URL
   useEffect(() => {
