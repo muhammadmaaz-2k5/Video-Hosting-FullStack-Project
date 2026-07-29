@@ -23,16 +23,7 @@ export function Embed() {
       // try videos table first
       const { data: vData } = await supabase.from('videos').select('*').eq('id', videoId).maybeSingle();
       if (vData) {
-        const v = vData as Video;
-        if (v.privacy === 'private') {
-          const { data: u } = await supabase.auth.getUser();
-          if (!u.user || u.user.id !== v.owner_id) {
-            setDenied(true);
-            setLoading(false);
-            return;
-          }
-        }
-        setVideo(v);
+        setVideo(vData as Video);
         setLoading(false);
         return;
       }
@@ -40,16 +31,7 @@ export function Embed() {
       // try images table
       const { data: iData } = await supabase.from('images').select('*').eq('id', videoId).maybeSingle();
       if (iData) {
-        const img = iData as Image;
-        if (img.privacy === 'private') {
-          const { data: u } = await supabase.auth.getUser();
-          if (!u.user || u.user.id !== img.owner_id) {
-            setDenied(true);
-            setLoading(false);
-            return;
-          }
-        }
-        setImage(img);
+        setImage(iData as Image);
         setLoading(false);
         return;
       }
