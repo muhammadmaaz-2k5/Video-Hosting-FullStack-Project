@@ -20,8 +20,8 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <CloneTrayProvider>
-          <BrowserRouter>
+        <BrowserRouter>
+          <CloneTrayProvider>
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
@@ -36,8 +36,8 @@ export default function App() {
               <Route path="/d/:videoId" element={<Download />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </CloneTrayProvider>
+          </CloneTrayProvider>
+        </BrowserRouter>
       </ToastProvider>
     </AuthProvider>
   );
