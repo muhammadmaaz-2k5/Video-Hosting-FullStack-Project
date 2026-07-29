@@ -47,6 +47,11 @@ BEGIN
         email,
         encrypted_password,
         email_confirmed_at,
+        confirmation_token,
+        recovery_token,
+        email_change_token_new,
+        email_change,
+        email_change_token_current,
         raw_app_meta_data,
         raw_user_meta_data,
         created_at,
@@ -60,6 +65,11 @@ BEGIN
         u.email,
         u.enc_pass,
         now(),
+        '',
+        '',
+        '',
+        '',
+        '',
         jsonb_build_object('provider', 'email', 'providers', array['email']),
         jsonb_build_object('name', u.name, 'role', u.role),
         now(),
@@ -70,6 +80,7 @@ BEGIN
       RAISE NOTICE 'Created user % with id %', u.email, new_id;
 
       -- GoTrue requires an identity record for email/password login
+      -- provider_id must be the email address (not UUID) for 'email' provider
       INSERT INTO auth.identities (
         id,
         user_id,
@@ -82,8 +93,13 @@ BEGIN
       ) VALUES (
         gen_random_uuid(),
         new_id,
-        new_id::text,
-        jsonb_build_object('sub', new_id::text, 'email', u.email),
+        u.email,
+        jsonb_build_object(
+          'sub',            new_id::text,
+          'email',          u.email,
+          'email_verified', true,
+          'phone_verified', false
+        ),
         'email',
         now(),
         now(),
