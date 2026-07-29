@@ -33,7 +33,7 @@ export function uploadToImageKit(
   )
     .then((res) => {
       if (!res.ok) throw new Error(`Auth failed (${res.status})`);
-      return res.json() as Promise<{ publicKey: string; token: string; expiry: number; signature: string }>;
+      return res.json() as Promise<{ publicKey: string; token: string; expire: number; signature: string }>;
     })
     .then((auth) => {
       // 2. Upload file to ImageKit via XHR with progress
@@ -45,7 +45,7 @@ export function uploadToImageKit(
         formData.append('folder', folder);
         formData.append('publicKey', auth.publicKey);
         formData.append('token', auth.token);
-        formData.append('expiry', String(auth.expiry));
+        formData.append('expire', String(auth.expire));
         formData.append('signature', auth.signature);
 
         xhr.upload.addEventListener('progress', (e) => {

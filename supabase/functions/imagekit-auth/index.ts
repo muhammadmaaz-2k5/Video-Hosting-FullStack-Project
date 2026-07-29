@@ -21,18 +21,18 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const expiry = Math.floor(Date.now() / 1000) + 1200; // 20 minutes
+  const expire = Math.floor(Date.now() / 1000) + 1200; // 20 minutes
   const token = crypto.randomUUID();
 
-  // Signature = HMAC-SHA1(PRIVATE_KEY, token + expiry)
-  const dataToSign = `${token}${expiry}`;
+  // Signature = HMAC-SHA1(PRIVATE_KEY, token + expire)
+  const dataToSign = `${token}${expire}`;
   const signature = await hmacSha1Hex(dataToSign, PRIVATE_KEY);
 
   return new Response(
     JSON.stringify({
       publicKey: PUBLIC_KEY,
       token,
-      expiry,
+      expire,
       signature,
     }),
     { headers: { "Content-Type": "application/json", ...corsHeaders } },
