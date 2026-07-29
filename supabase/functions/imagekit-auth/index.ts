@@ -24,8 +24,8 @@ Deno.serve(async (req: Request) => {
   const expiry = Math.floor(Date.now() / 1000) + 1200; // 20 minutes
   const token = crypto.randomUUID();
 
-  // Signature = HMAC-SHA1(PRIVATE_KEY, expiry + token)
-  const dataToSign = `${expiry}${token}`;
+  // Signature = HMAC-SHA1(PRIVATE_KEY, token + expiry)
+  const dataToSign = `${token}${expiry}`;
   const signature = await hmacSha1Hex(dataToSign, PRIVATE_KEY);
 
   return new Response(
