@@ -128,8 +128,10 @@ export function Clone() {
       update(itemId, { status: 'processing', progress: 40 });
 
       const rawName = p.raw.split('?')[0].split('/').pop()?.replace(/\.[^.]+$/, '')?.replace(/_/g, ' ') || '';
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(rawName);
-      const srcTitle = (srcRecord?.title as string) || (isUuid ? `${isImage ? 'Image' : 'Video'} clone` : decodeURIComponent(rawName) || 'Untitled');
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+      const dbTitle = (srcRecord?.title as string) || '';
+      const isUuidTitle = uuidRe.test(dbTitle) || uuidRe.test(rawName);
+      const srcTitle = isUuidTitle ? (isImage ? 'Image' : 'Video') : (dbTitle || decodeURIComponent(rawName) || 'Untitled');
       const srcSize = (srcRecord?.size_bytes as number) ?? 0;
       const srcPath = (srcRecord?.storage_path as string) || p.raw;
       const srcContentType = (srcRecord?.content_type as string) || (isImage ? 'image/jpeg' : 'video/mp4');
