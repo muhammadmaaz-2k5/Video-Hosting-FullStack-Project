@@ -70,7 +70,7 @@ BEGIN
     (gen_random_uuid(), creator_id, travel_folder, 'Tokyo Street Food Tour',
      'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4',
      320000000, 'video/mp4',
-     'https://images.pexels.com/photos/3129957/pexels-photo-3129957.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop',
+     'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop',
      'ready', 'public', 892, 15, now() - interval '5 days')
   ON CONFLICT DO NOTHING RETURNING id INTO v2;
 
@@ -116,7 +116,7 @@ BEGIN
     (gen_random_uuid(), creator_id, featured_folder, 'Mountain Timelapse — Dolomites',
      'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4',
      64000000, 'video/mp4',
-     'https://images.pexels.com/photos/364026/pexels-photo-364026.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop',
+     'https://images.pexels.com/photos/691668/pexels-photo-691668.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop',
      'ready', 'public', 5621, 89, now() - interval '8 days')
   ON CONFLICT DO NOTHING RETURNING id INTO fv1;
 

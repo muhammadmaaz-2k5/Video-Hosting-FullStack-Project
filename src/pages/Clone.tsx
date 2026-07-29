@@ -119,9 +119,11 @@ export function Clone() {
       await sleep(700);
       update(itemId, { status: 'processing', progress: 40 });
 
-      const table = isImage ? 'images' : 'videos';
-      const insertData = isImage
-        ? {
+      let row: { id: string } | null = null;
+      let dbErr = null;
+
+      if (isImage) {
+        const res = await supabase.from('images').insert({
             owner_id: user.id,
             folder_id: targetFolderId,
             title: 'Cloned image',
@@ -131,8 +133,11 @@ export function Clone() {
             thumbnail_url: p.raw,
             status: 'processing',
             privacy: 'private',
-          }
-        : {
+          }).select().single();
+        row = res.data;
+        dbErr = res.error;
+      } else {
+        const res = await supabase.from('videos').insert({
             owner_id: user.id,
             folder_id: targetFolderId,
             title: 'Cloned video',
@@ -143,10 +148,11 @@ export function Clone() {
             status: 'processing',
             privacy: 'private',
             cloned_from: p.id ?? null,
-          };
-
-      const { data: row, error: dbErr } = await supabase.from(table).insert(insertData).select().single();
-      if (dbErr) {
+          }).select().single();
+        row = res.data;
+        dbErr = res.error;
+      }
+      if (dbErr || !row) {
         update(itemId, { status: 'failed' });
         continue;
       }
@@ -158,7 +164,7 @@ export function Clone() {
         await supabase.rpc('increment_clone_count', { v_id: p.id }).then(() => {});
       }
 
-      await supabase.from(table).update({ status: 'ready' }).eq('id', row.id);
+      await supabase.from(isImage ? 'images' : 'videos').update({ status: 'ready' }).eq('id', row.id);
       update(itemId, { status: 'done', progress: 100 });
 
       await supabase.from('activity').insert({
