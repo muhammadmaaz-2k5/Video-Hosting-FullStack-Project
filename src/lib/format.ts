@@ -50,24 +50,24 @@ export function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
-const PEXELS_BASE = 'https://images.pexels.com/photos';
+const PLACEHOLDER_BASE = 'https://picsum.photos/seed';
 
 export const STOCK_POSTERS = [
-  `${PEXELS_BASE}/3129957/pexels-photo-3129957.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop`,
-  `${PEXELS_BASE}/2873486/pexels-photo-2873486.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop`,
-  `${PEXELS_BASE}/1190297/pexels-photo-1190297.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop`,
-  `${PEXELS_BASE}/167636/pexels-photo-167636.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop`,
-  `${PEXELS_BASE}/3052361/pexels-photo-3052361.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop`,
-  `${PEXELS_BASE}/325185/pexels-photo-325185.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop`,
-  `${PEXELS_BASE}/364026/pexels-photo-364026.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop`,
-  `${PEXELS_BASE}/3573555/pexels-photo-3573555.jpeg?auto=compress&cs=tinysrgb&w=640&h=360&fit=crop`,
+  `${PLACEHOLDER_BASE}/vault1/640/360`,
+  `${PLACEHOLDER_BASE}/vault2/640/360`,
+  `${PLACEHOLDER_BASE}/vault3/640/360`,
+  `${PLACEHOLDER_BASE}/vault4/640/360`,
+  `${PLACEHOLDER_BASE}/vault5/640/360`,
+  `${PLACEHOLDER_BASE}/vault6/640/360`,
+  `${PLACEHOLDER_BASE}/vault7/640/360`,
+  `${PLACEHOLDER_BASE}/vault8/640/360`,
 ];
 
 const STOCK_IMAGES = [
-  `${PEXELS_BASE}/1366919/pexels-photo-1366919.jpeg?auto=compress&cs=tinysrgb&w=400`,
-  `${PEXELS_BASE}/1366913/pexels-photo-1366913.jpeg?auto=compress&cs=tinysrgb&w=400`,
-  `${PEXELS_BASE}/1670977/pexels-photo-1670977.jpeg?auto=compress&cs=tinysrgb&w=400`,
-  `${PEXELS_BASE}/2387873/pexels-photo-2387873.jpeg?auto=compress&cs=tinysrgb&w=400`,
+  `${PLACEHOLDER_BASE}/vault9/400/300`,
+  `${PLACEHOLDER_BASE}/vault10/400/300`,
+  `${PLACEHOLDER_BASE}/vault11/400/300`,
+  `${PLACEHOLDER_BASE}/vault12/400/300`,
 ];
 
 export function posterFor(index: number): string {
