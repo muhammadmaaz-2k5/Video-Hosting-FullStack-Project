@@ -19,3 +19,16 @@ export const supabase = createClient(url, anonKey, {
     params: { eventsPerSecond: 10 },
   },
 });
+
+const SUPABASE_URL = url;
+
+export function publicStorageUrl(storagePath: string): string {
+  if (!storagePath) return '';
+  if (storagePath.startsWith('http')) {
+    if (storagePath.includes('/storage/v1/object/media/')) {
+      return storagePath.replace('/storage/v1/object/media/', '/storage/v1/object/public/media/');
+    }
+    return storagePath;
+  }
+  return `${SUPABASE_URL}/storage/v1/object/public/media/${storagePath}`;
+}

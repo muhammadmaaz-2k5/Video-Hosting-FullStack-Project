@@ -4,7 +4,7 @@ import { Download as DownloadIcon, Lock, FileVideo, HardDrive, FileCode } from '
 import { EmptyState } from '@/components/EmptyState';
 import { StatusStateVisual } from '@/components/StatusBadge';
 import { cldPoster } from '@/lib/cloudinary';
-import { supabase } from '@/lib/supabase';
+import { supabase, publicStorageUrl } from '@/lib/supabase';
 import { formatBytes } from '@/lib/format';
 import type { Video } from '@/lib/types';
 
@@ -114,7 +114,7 @@ export function Download() {
           </div>
         </div>
 
-        <a href={video.storage_path || '#'} download className="btn-primary w-full py-3 text-base">
+        <a href={publicStorageUrl(video.storage_path || '') || '#'} download className="btn-primary w-full py-3 text-base">
           <DownloadIcon className="w-5 h-5" /> Download video
         </a>
       </main>

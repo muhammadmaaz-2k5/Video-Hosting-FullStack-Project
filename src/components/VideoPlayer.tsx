@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, publicStorageUrl } from '@/lib/supabase';
 import { uuid } from '@/lib/format';
 
 interface Props {
@@ -61,7 +61,7 @@ export function VideoPlayer({ videoId, videoSrc, poster, title }: Props) {
     <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group">
       <video
         ref={videoRef}
-        src={videoSrc || undefined}
+        src={videoSrc ? publicStorageUrl(videoSrc) : undefined}
         poster={poster ?? undefined}
         controls
         playsInline

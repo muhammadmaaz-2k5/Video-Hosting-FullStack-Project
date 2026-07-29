@@ -8,7 +8,7 @@ import { CopyLinkButton } from '@/components/CopyLinkButton';
 import { StatusStateVisual } from '@/components/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, publicStorageUrl } from '@/lib/supabase';
 import { posterFor } from '@/lib/format';
 import { cldPoster, cldThumb } from '@/lib/cloudinary';
 import type { AssetStatus, Privacy, Folder } from '@/lib/types';
@@ -105,7 +105,7 @@ export function Upload() {
     }
 
     const { data: pub } = supabase.storage.from('media').getPublicUrl(path);
-    const url = pub.publicUrl;
+    const url = publicStorageUrl(pub.publicUrl || path);
 
     setStatus('processing');
 
