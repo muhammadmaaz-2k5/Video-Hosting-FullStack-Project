@@ -10,8 +10,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { supabase } from '@/lib/supabase';
 import { posterFor } from '@/lib/format';
-import { cldPoster, uploadToCloudinary } from '@/lib/cloudinary';
-import { ikThumb, uploadToImageKit } from '@/lib/imagekit';
+import { cldPoster, cldThumb, uploadToCloudinary } from '@/lib/cloudinary';
+// import { ikThumb, uploadToImageKit } from '@/lib/imagekit';
 import type { AssetStatus, Privacy, Folder } from '@/lib/types';
 
 type Kind = 'video' | 'image';
@@ -107,16 +107,16 @@ export function Upload() {
       uploadUrl = url;
       uploadSize = result?.bytes ?? file.size;
     } else {
-      // Images -> ImageKit
-      const folder = `/vaultstream/${user.id}/images`;
-      const { url, result, error: upErr } = await uploadToImageKit(file, folder, setProgress);
+      // Images -> Cloudinary
+      const folder = `vaultstream/${user.id}/images`;
+      const { url, result, error: upErr } = await uploadToCloudinary(file, folder, setProgress);
       if (upErr || !url) {
         setStatus('failed');
         error(upErr ?? 'Upload failed');
         return;
       }
       uploadUrl = url;
-      uploadSize = result?.size ?? file.size;
+      uploadSize = result?.bytes ?? file.size;
     }
 
     setProgress(100);
@@ -151,7 +151,7 @@ export function Upload() {
         content_type: file.type,
         privacy,
         status: 'ready',
-        thumbnail_url: ikThumb(uploadUrl),
+        thumbnail_url: cldThumb(uploadUrl),
       }).select().single();
       row = res.data;
       dbErr = res.error;
