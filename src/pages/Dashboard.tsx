@@ -52,6 +52,7 @@ export function Dashboard() {
   const loadAll = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+
     const [v, im, f, act] = await Promise.all([
       supabase.from('videos').select('*').eq('owner_id', user.id),
       supabase.from('images').select('*').eq('owner_id', user.id),
@@ -77,19 +78,45 @@ export function Dashboard() {
     setVideos(vids);
     setActivities(acts);
 
-    // build 7-day chart from view_count (approximate daily distribution)
-    const days: { label: string; value: number }[] = [];
+    // ── Real analytics: query view_events for last 7 days ─────────────────
     const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const label = d.toLocaleDateString('en-US', { weekday: 'short' });
-      const dayNum = d.getDate();
-      const seed = (dayNum * 7 + i * 3) % 40;
-      days.push({ label, value: seed });
-    }
-    setChartData(days);
+    // Start of 6 days ago (midnight)
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
 
+    const days: { label: string; value: number }[] = [];
+
+    if (vids.length > 0) {
+      const videoIds = vids.map((vid) => vid.id);
+
+      const { data: viewRows } = await supabase
+        .from('view_events')
+        .select('joined_at')
+        .in('video_id', videoIds)
+        .gte('joined_at', sevenDaysAgo.toISOString());
+
+      const rows = viewRows ?? [];
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const dayStr = d.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+        const label = d.toLocaleDateString('en-US', { weekday: 'short' });
+        const count = rows.filter((r) => r.joined_at.startsWith(dayStr)).length;
+        days.push({ label, value: count });
+      }
+    } else {
+      // No videos yet — show empty chart with day labels
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const label = d.toLocaleDateString('en-US', { weekday: 'short' });
+        days.push({ label, value: 0 });
+      }
+    }
+
+    setChartData(days);
     setLoading(false);
   }, [user]);
 
@@ -179,7 +206,7 @@ export function Dashboard() {
               <h2 className="text-base font-semibold text-text-primary flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-accent" /> Last 7 days stats
               </h2>
-              <p className="text-xs text-text-muted mt-0.5">Daily views across all your videos</p>
+              <p className="text-xs text-text-muted mt-0.5">Daily views from your audience (last 7 days)</p>
             </div>
           </div>
           <LineChart data={chartData} />

@@ -15,6 +15,67 @@ import type { AssetStatus, Privacy, Folder } from '@/lib/types';
 
 type Kind = 'video' | 'image';
 
+/** Upload a file to Supabase Storage via XHR so we get real byte-level progress. */
+async function uploadWithProgress(
+  path: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<{ publicUrl: string | null; error: string | null }> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+  // Use the authenticated user's JWT when available
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token ?? supabaseAnonKey;
+
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/media/${path}`;
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        // Reserve the last 5 % for the DB write step
+        const pct = Math.round((e.loaded / e.total) * 95);
+        onProgress(pct);
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(100);
+        const publicUrl = `${supabaseUrl}/storage/v1/object/public/media/${path}`;
+        resolve({ publicUrl, error: null });
+      } else {
+        let msg = `Upload failed (HTTP ${xhr.status})`;
+        try {
+          const body = JSON.parse(xhr.responseText);
+          if (body?.message) msg = body.message;
+        } catch {
+          // ignore parse errors
+        }
+        resolve({ publicUrl: null, error: msg });
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      resolve({ publicUrl: null, error: 'Network error — please check your connection.' });
+    });
+
+    xhr.addEventListener('abort', () => {
+      resolve({ publicUrl: null, error: 'Upload cancelled.' });
+    });
+
+    xhr.open('POST', uploadUrl);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    // x-upsert: false prevents accidental overwrites
+    xhr.setRequestHeader('x-upsert', 'false');
+    xhr.send(file);
+  });
+}
+
 export function Upload() {
   const { user } = useAuth();
   const { success, error } = useToast();
@@ -33,12 +94,17 @@ export function Upload() {
 
   const loadFolders = async () => {
     if (!user) return;
-    const { data } = await supabase.from('folders').select('*').eq('owner_id', user.id).order('name');
+    const { data } = await supabase
+      .from('folders')
+      .select('*')
+      .eq('owner_id', user.id)
+      .order('name');
     if (data) setFolders(data as Folder[]);
   };
 
   useEffect(() => {
     loadFolders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const onFile = (f: File) => {
@@ -58,6 +124,7 @@ export function Upload() {
     setStatus(null);
     setResultId(null);
     setPreview(null);
+    setProgress(0);
   };
 
   const createFolder = async () => {
@@ -80,33 +147,29 @@ export function Upload() {
 
   const upload = async () => {
     if (!file || !user) return;
+
     setStatus('uploading');
     setProgress(0);
 
     const ext = file.name.split('.').pop() || (kind === 'video' ? 'mp4' : 'jpg');
     const path = `${user.id}/${kind}s/${crypto.randomUUID()}.${ext}`;
 
-    // simulate upload progress (supabase-js v2 has no progress callback)
-    const progInterval = setInterval(() => {
-      setProgress((p) => Math.min(p + Math.random() * 18, 92));
-    }, 200);
+    // ── Phase 1: real XHR upload with byte-level progress ───────────────────
+    const { publicUrl, error: upErr } = await uploadWithProgress(
+      path,
+      file,
+      setProgress,
+    );
 
-    const { error: upErr } = await supabase.storage
-      .from('media')
-      .upload(path, file, { contentType: file.type });
-
-    clearInterval(progInterval);
-    setProgress(100);
-
-    if (upErr) {
+    if (upErr || !publicUrl) {
       setStatus('failed');
-      error('Upload failed');
+      error(upErr ?? 'Upload failed');
       return;
     }
 
-    const { data: pub } = supabase.storage.from('media').getPublicUrl(path);
-    const url = publicStorageUrl(pub.publicUrl || path);
+    const url = publicStorageUrl(publicUrl);
 
+    // ── Phase 2: insert DB record ────────────────────────────────────────────
     setStatus('processing');
 
     const insertData = {
@@ -117,35 +180,36 @@ export function Upload() {
       size_bytes: file.size,
       content_type: file.type,
       privacy,
-      status: 'processing',
-      poster_url: kind === 'video' ? cldPoster(posterFor(Math.floor(Math.random() * 8))) : null,
+      // Mark ready immediately — the file is already streamable from storage
+      status: 'ready',
+      poster_url:
+        kind === 'video' ? cldPoster(posterFor(Math.floor(Math.random() * 8))) : null,
       thumbnail_url: kind === 'image' ? cldThumb(url) : null,
     };
 
     const table = kind === 'video' ? 'videos' : 'images';
-    const { data: row, error: dbErr } = await supabase.from(table).insert(insertData).select().single();
+    const { data: row, error: dbErr } = await supabase
+      .from(table)
+      .insert(insertData)
+      .select()
+      .single();
 
     if (dbErr) {
       setStatus('failed');
-      error('Could not save record');
+      error('Could not save record — please try again.');
       return;
     }
 
-    setResultId(row.id);
-
-    // log activity
+    // ── Phase 3: log activity ────────────────────────────────────────────────
     await supabase.from('activity').insert({
       user_id: user.id,
       type: 'upload',
       message: `Uploaded ${kind} "${title || file.name}"`,
     });
 
-    // simulate transcoding then flip to ready
-    setTimeout(async () => {
-      await supabase.from(table).update({ status: 'ready' }).eq('id', row.id);
-      setStatus('ready');
-      success(`${kind === 'video' ? 'Video' : 'Image'} ready to stream!`);
-    }, 2600);
+    setResultId(row.id);
+    setStatus('ready');
+    success(`${kind === 'video' ? 'Video' : 'Image'} ready to stream!`);
   };
 
   const link = resultId ? `${window.location.origin}/e/${resultId}` : null;
@@ -165,7 +229,9 @@ export function Upload() {
                 clearFile();
               }}
               className={`btn px-4 py-2 text-sm capitalize transition-colors ${
-                kind === k ? 'bg-accent text-black font-semibold' : 'bg-surface-hover text-text-muted hover:text-text-primary'
+                kind === k
+                  ? 'bg-accent text-black font-semibold'
+                  : 'bg-surface-hover text-text-muted hover:text-text-primary'
               }`}
             >
               {k === 'video' ? <Film className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
@@ -176,6 +242,7 @@ export function Upload() {
 
         <div className="card p-6">
           <AnimatePresence mode="wait">
+            {/* ── Success state ─────────────────────────────────────────────── */}
             {status === 'ready' && resultId ? (
               <motion.div
                 key="success"
@@ -193,25 +260,51 @@ export function Upload() {
                   <CopyLinkButton url={link!} label="Copy" />
                 </div>
                 <div className="flex gap-3 mt-6">
-                  <button onClick={clearFile} className="btn-secondary text-sm">Upload another</button>
-                  <a href={link!} target="_blank" rel="noreferrer" className="btn-primary text-sm">Open</a>
+                  <button onClick={clearFile} className="btn-secondary text-sm">
+                    Upload another
+                  </button>
+                  <a href={link!} target="_blank" rel="noreferrer" className="btn-primary text-sm">
+                    Open
+                  </a>
                 </div>
               </motion.div>
             ) : status && status !== 'queued' ? (
+              /* ── Uploading / processing / failed state ────────────────────── */
               <motion.div
                 key="processing"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center py-12"
+                className="flex flex-col items-center py-10 gap-4"
               >
                 <StatusStateVisual status={status} progress={progress} />
-                <p className="text-sm text-text-muted mt-4">
-                  {status === 'uploading' && `Uploading ${progress}%…`}
-                  {status === 'processing' && 'Transcoding to HLS… this takes a moment'}
+
+                {/* Real progress bar */}
+                {(status === 'uploading' || status === 'processing') && (
+                  <div className="w-full max-w-sm">
+                    <div className="flex justify-between text-xs text-text-muted mb-1.5">
+                      <span>
+                        {status === 'uploading' ? 'Uploading…' : 'Saving to library…'}
+                      </span>
+                      <span className="tabular-nums font-medium text-accent">{progress}%</span>
+                    </div>
+                    <div className="h-2 bg-surface-hover rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-accent rounded-full"
+                        animate={{ width: `${progress}%` }}
+                        transition={{ ease: 'easeOut', duration: 0.2 }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-sm text-text-muted">
+                  {status === 'uploading' && `Transferring ${progress}%…`}
+                  {status === 'processing' && 'Saving your file…'}
                   {status === 'failed' && 'Upload failed. Please try again.'}
                 </p>
               </motion.div>
             ) : (
+              /* ── Form / dropzone state ────────────────────────────────────── */
               <motion.div
                 key="form"
                 initial={{ opacity: 0 }}
@@ -258,7 +351,9 @@ export function Upload() {
                         >
                           <option value="">/ (Root)</option>
                           {folders.map((f) => (
-                            <option key={f.id} value={f.id}>/{f.name}</option>
+                            <option key={f.id} value={f.id}>
+                              /{f.name}
+                            </option>
                           ))}
                         </select>
                         <button
@@ -291,10 +386,7 @@ export function Upload() {
                     </div>
 
                     <div className="flex justify-end pt-2">
-                      <button
-                        onClick={upload}
-                        className="btn-primary"
-                      >
+                      <button onClick={upload} className="btn-primary">
                         <>Upload {kind}</>
                       </button>
                     </div>
