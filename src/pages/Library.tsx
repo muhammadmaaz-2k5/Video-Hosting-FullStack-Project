@@ -65,6 +65,8 @@ export function Library() {
       supabase.from('folders').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }),
     ]);
 
+    if (im.error) console.warn('Images query error:', im.error.message);
+
     const all: Row[] = [
       ...((f.data as Folder[]) ?? []).map((d) => ({
         id: d.id, kind: 'folder' as const, name: d.name, size: 0, created: d.created_at,

@@ -72,7 +72,7 @@ export function Embed() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col max-w-5xl w-full mx-auto p-4">
-          <VideoPlayer videoId={video.id} poster={video.poster_url ? cldPoster(video.poster_url) : undefined} title={video.title} />
+          <VideoPlayer videoId={video.id} videoSrc={video.storage_path} poster={video.poster_url ? cldPoster(video.poster_url) : undefined} title={video.title} />
           <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h1 className="text-lg font-bold text-text-primary">{video.title}</h1>

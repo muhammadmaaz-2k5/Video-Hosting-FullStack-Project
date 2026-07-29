@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { uuid, SAMPLE_VIDEO_SRC } from '@/lib/format';
+import { uuid } from '@/lib/format';
 
 interface Props {
   videoId: string;
+  videoSrc?: string | null;
   poster?: string | null;
   title: string;
 }
@@ -12,7 +13,7 @@ interface Props {
  * Native <video> player that emits presence (view:join) on mount
  * and view:leave on unmount, so the dashboard's live viewer count works.
  */
-export function VideoPlayer({ videoId, poster, title }: Props) {
+export function VideoPlayer({ videoId, videoSrc, poster, title }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const sessionIdRef = useRef<string>(uuid());
   const channelIdRef = useRef<string>('');
@@ -60,7 +61,7 @@ export function VideoPlayer({ videoId, poster, title }: Props) {
     <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group">
       <video
         ref={videoRef}
-        src={SAMPLE_VIDEO_SRC}
+        src={videoSrc || undefined}
         poster={poster ?? undefined}
         controls
         playsInline

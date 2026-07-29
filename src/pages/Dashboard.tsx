@@ -59,6 +59,8 @@ export function Dashboard() {
       supabase.from('activity').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(12),
     ]);
 
+    if (im.error) console.warn('Images query error:', im.error.message);
+
     const vids = (v.data as Video[]) ?? [];
     const imgs = (im.data as ImageAsset[]) ?? [];
     const flds = (f.data as Folder[]) ?? [];

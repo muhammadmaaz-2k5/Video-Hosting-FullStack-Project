@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import { Download as DownloadIcon, Lock, FileVideo, HardDrive, FileCode } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { StatusStateVisual } from '@/components/StatusBadge';
-import { SAMPLE_VIDEO_SRC } from '@/lib/format';
 import { cldPoster } from '@/lib/cloudinary';
 import { supabase } from '@/lib/supabase';
 import { formatBytes } from '@/lib/format';
@@ -115,7 +114,7 @@ export function Download() {
           </div>
         </div>
 
-        <a href={SAMPLE_VIDEO_SRC} download className="btn-primary w-full py-3 text-base">
+        <a href={video.storage_path || '#'} download className="btn-primary w-full py-3 text-base">
           <DownloadIcon className="w-5 h-5" /> Download video
         </a>
       </main>
