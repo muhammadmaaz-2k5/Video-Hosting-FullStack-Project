@@ -180,17 +180,16 @@ export function Upload() {
       size_bytes: file.size,
       content_type: file.type,
       privacy,
-      // Mark ready immediately — the file is already streamable from storage
       status: 'ready',
-      poster_url:
-        kind === 'video' ? cldPoster(posterFor(Math.floor(Math.random() * 8))) : null,
-      thumbnail_url: kind === 'image' ? cldThumb(url) : null,
+      ...(kind === 'video'
+        ? { poster_url: cldPoster(posterFor(Math.floor(Math.random() * 8))) }
+        : { thumbnail_url: cldThumb(url) }),
     };
 
     const table = kind === 'video' ? 'videos' : 'images';
     const { data: row, error: dbErr } = await supabase
       .from(table)
-      .insert(insertData)
+      .insert(insertData as any)
       .select()
       .single();
 
