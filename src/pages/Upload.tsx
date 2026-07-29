@@ -8,73 +8,12 @@ import { CopyLinkButton } from '@/components/CopyLinkButton';
 import { StatusStateVisual } from '@/components/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { supabase, publicStorageUrl } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { posterFor } from '@/lib/format';
-import { cldPoster, cldThumb } from '@/lib/cloudinary';
+import { cldPoster, cldThumb, uploadToCloudinary } from '@/lib/cloudinary';
 import type { AssetStatus, Privacy, Folder } from '@/lib/types';
 
 type Kind = 'video' | 'image';
-
-/** Upload a file to Supabase Storage via XHR so we get real byte-level progress. */
-async function uploadWithProgress(
-  path: string,
-  file: File,
-  onProgress: (pct: number) => void,
-): Promise<{ publicUrl: string | null; error: string | null }> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-  // Use the authenticated user's JWT when available
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token ?? supabaseAnonKey;
-
-  return new Promise((resolve) => {
-    const xhr = new XMLHttpRequest();
-    const uploadUrl = `${supabaseUrl}/storage/v1/object/media/${path}`;
-
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable) {
-        // Reserve the last 5 % for the DB write step
-        const pct = Math.round((e.loaded / e.total) * 95);
-        onProgress(pct);
-      }
-    });
-
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress(100);
-        const publicUrl = `${supabaseUrl}/storage/v1/object/public/media/${path}`;
-        resolve({ publicUrl, error: null });
-      } else {
-        let msg = `Upload failed (HTTP ${xhr.status})`;
-        try {
-          const body = JSON.parse(xhr.responseText);
-          if (body?.message) msg = body.message;
-        } catch {
-          // ignore parse errors
-        }
-        resolve({ publicUrl: null, error: msg });
-      }
-    });
-
-    xhr.addEventListener('error', () => {
-      resolve({ publicUrl: null, error: 'Network error — please check your connection.' });
-    });
-
-    xhr.addEventListener('abort', () => {
-      resolve({ publicUrl: null, error: 'Upload cancelled.' });
-    });
-
-    xhr.open('POST', uploadUrl);
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-    // x-upsert: false prevents accidental overwrites
-    xhr.setRequestHeader('x-upsert', 'false');
-    xhr.send(file);
-  });
-}
 
 export function Upload() {
   const { user } = useAuth();
@@ -151,49 +90,55 @@ export function Upload() {
     setStatus('uploading');
     setProgress(0);
 
-    const ext = file.name.split('.').pop() || (kind === 'video' ? 'mp4' : 'jpg');
-    const path = `${user.id}/${kind}s/${crypto.randomUUID()}.${ext}`;
+    // Upload directly to Cloudinary
+    const folder = `vaultstream/${user.id}/${kind}s`;
+    const { url, result, error: upErr } = await uploadToCloudinary(file, folder, setProgress);
 
-    // ── Phase 1: real XHR upload with byte-level progress ───────────────────
-    const { publicUrl, error: upErr } = await uploadWithProgress(
-      path,
-      file,
-      setProgress,
-    );
-
-    if (upErr || !publicUrl) {
+    if (upErr || !url) {
       setStatus('failed');
       error(upErr ?? 'Upload failed');
       return;
     }
 
-    const url = publicStorageUrl(publicUrl);
+    setProgress(100);
 
-    // ── Phase 2: insert DB record ────────────────────────────────────────────
+    // ── Phase 2: insert DB record with Cloudinary URL ────────────────────────
     setStatus('processing');
 
-    const insertData = {
-      owner_id: user.id,
-      folder_id: folderId || null,
-      title: title || file.name,
-      storage_path: url,
-      size_bytes: file.size,
-      content_type: file.type,
-      privacy,
-      status: 'ready',
-      ...(kind === 'video'
-        ? { poster_url: cldPoster(posterFor(Math.floor(Math.random() * 8))) }
-        : { thumbnail_url: cldThumb(url) }),
-    };
+    let row: { id: string } | null = null;
+    let dbErr = null;
 
-    const table = kind === 'video' ? 'videos' : 'images';
-    const { data: row, error: dbErr } = await supabase
-      .from(table)
-      .insert(insertData as any)
-      .select()
-      .single();
+    if (kind === 'video') {
+      const res = await supabase.from('videos').insert({
+        owner_id: user.id,
+        folder_id: folderId || null,
+        title: title || file.name,
+        storage_path: url,
+        size_bytes: result?.bytes ?? file.size,
+        content_type: file.type,
+        privacy,
+        status: 'ready',
+        poster_url: cldPoster(posterFor(Math.floor(Math.random() * 8))),
+      }).select().single();
+      row = res.data;
+      dbErr = res.error;
+    } else {
+      const res = await supabase.from('images').insert({
+        owner_id: user.id,
+        folder_id: folderId || null,
+        title: title || file.name,
+        storage_path: url,
+        size_bytes: result?.bytes ?? file.size,
+        content_type: file.type,
+        privacy,
+        status: 'ready',
+        thumbnail_url: cldThumb(url),
+      }).select().single();
+      row = res.data;
+      dbErr = res.error;
+    }
 
-    if (dbErr) {
+    if (dbErr || !row) {
       setStatus('failed');
       error('Could not save record — please try again.');
       return;
