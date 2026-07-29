@@ -10,7 +10,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { supabase } from '@/lib/supabase';
 import { posterFor } from '@/lib/format';
-import { cldPoster, cldThumb, uploadToCloudinary } from '@/lib/cloudinary';
+import { cldPoster, uploadToCloudinary } from '@/lib/cloudinary';
+import { ikThumb, uploadToImageKit } from '@/lib/imagekit';
 import type { AssetStatus, Privacy, Folder } from '@/lib/types';
 
 type Kind = 'video' | 'image';
@@ -90,19 +91,37 @@ export function Upload() {
     setStatus('uploading');
     setProgress(0);
 
-    // Upload directly to Cloudinary
-    const folder = `vaultstream/${user.id}/${kind}s`;
-    const { url, result, error: upErr } = await uploadToCloudinary(file, folder, setProgress);
+    // ── Phase 1: upload to the right CDN ─────────────────────────────────────
+    let uploadUrl: string | null = null;
+    let uploadSize = file.size;
 
-    if (upErr || !url) {
-      setStatus('failed');
-      error(upErr ?? 'Upload failed');
-      return;
+    if (kind === 'video') {
+      // Videos -> Cloudinary
+      const folder = `vaultstream/${user.id}/videos`;
+      const { url, result, error: upErr } = await uploadToCloudinary(file, folder, setProgress);
+      if (upErr || !url) {
+        setStatus('failed');
+        error(upErr ?? 'Upload failed');
+        return;
+      }
+      uploadUrl = url;
+      uploadSize = result?.bytes ?? file.size;
+    } else {
+      // Images -> ImageKit
+      const folder = `/vaultstream/${user.id}/images`;
+      const { url, result, error: upErr } = await uploadToImageKit(file, folder, setProgress);
+      if (upErr || !url) {
+        setStatus('failed');
+        error(upErr ?? 'Upload failed');
+        return;
+      }
+      uploadUrl = url;
+      uploadSize = result?.size ?? file.size;
     }
 
     setProgress(100);
 
-    // ── Phase 2: insert DB record with Cloudinary URL ────────────────────────
+    // ── Phase 2: insert DB record ─────────────────────────────────────────────
     setStatus('processing');
 
     let row: { id: string } | null = null;
@@ -113,8 +132,8 @@ export function Upload() {
         owner_id: user.id,
         folder_id: folderId || null,
         title: title || file.name,
-        storage_path: url,
-        size_bytes: result?.bytes ?? file.size,
+        storage_path: uploadUrl,
+        size_bytes: uploadSize,
         content_type: file.type,
         privacy,
         status: 'ready',
@@ -127,12 +146,12 @@ export function Upload() {
         owner_id: user.id,
         folder_id: folderId || null,
         title: title || file.name,
-        storage_path: url,
-        size_bytes: result?.bytes ?? file.size,
+        storage_path: uploadUrl,
+        size_bytes: uploadSize,
         content_type: file.type,
         privacy,
         status: 'ready',
-        thumbnail_url: cldThumb(url),
+        thumbnail_url: ikThumb(uploadUrl),
       }).select().single();
       row = res.data;
       dbErr = res.error;
