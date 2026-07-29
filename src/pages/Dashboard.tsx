@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -121,16 +121,48 @@ export function Dashboard() {
   }, [user]);
 
   // poll presence counts for each video
+  const presenceChannelsRef = useRef<Map<string, ReturnType<typeof supabase.channel>>>(new Map());
+
   const pollLive = useCallback(async () => {
     if (videos.length === 0) return;
     const counts: Record<string, number> = {};
     let total = 0;
-    for (const vid of videos) {
-      const state = await supabase.channel(`video:${vid.id}`).presenceState();
-      const n = Object.keys(state).length;
-      counts[vid.id] = n;
-      total += n;
+
+    // Ensure we have subscribed presence channels for each video
+    const currentIds = new Set(videos.map((v) => v.id));
+
+    // Remove channels for videos no longer in the list
+    for (const [id, ch] of presenceChannelsRef.current) {
+      if (!currentIds.has(id)) {
+        supabase.removeChannel(ch);
+        presenceChannelsRef.current.delete(id);
+      }
     }
+
+    // Subscribe to presence channels for new videos
+    for (const vid of videos) {
+      if (!presenceChannelsRef.current.has(vid.id)) {
+        const ch = supabase.channel(`video:${vid.id}`, {
+          config: { presence: { key: `dashboard-${vid.id}` } },
+        });
+        ch.subscribe();
+        presenceChannelsRef.current.set(vid.id, ch);
+      }
+    }
+
+    // Poll presence state from subscribed channels
+    for (const vid of videos) {
+      const ch = presenceChannelsRef.current.get(vid.id);
+      if (ch) {
+        const state = ch.presenceState();
+        const n = Object.keys(state).length;
+        counts[vid.id] = n;
+        total += n;
+      } else {
+        counts[vid.id] = 0;
+      }
+    }
+
     setLiveViewers(counts);
     setLiveCount(total);
   }, [videos]);
@@ -145,6 +177,17 @@ export function Dashboard() {
     const interval = setInterval(pollLive, 4000);
     return () => clearInterval(interval);
   }, [pollLive, videos.length]);
+
+  // Cleanup presence channels on unmount
+  useEffect(() => {
+    const channels = presenceChannelsRef.current;
+    return () => {
+      for (const [, ch] of channels) {
+        supabase.removeChannel(ch);
+      }
+      channels.clear();
+    };
+  }, []);
 
   // realtime: update videos + prepend new activity
   useRealtime({

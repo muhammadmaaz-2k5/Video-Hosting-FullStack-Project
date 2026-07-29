@@ -16,6 +16,7 @@ interface SubscribeOptions {
  */
 export function useRealtime(opts: SubscribeOptions) {
   useEffect(() => {
+    let cleaned = false;
     const channels: ReturnType<typeof supabase.channel>[] = [];
 
     if (opts.onVideoChange) {
@@ -26,7 +27,11 @@ export function useRealtime(opts: SubscribeOptions) {
           { event: '*', schema: 'public', table: 'videos' },
           (payload) => opts.onVideoChange?.(payload.new as Video),
         )
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' && !cleaned) {
+            console.warn('[Realtime] videos-changes subscription error');
+          }
+        });
       channels.push(ch);
     }
 
@@ -38,7 +43,11 @@ export function useRealtime(opts: SubscribeOptions) {
           { event: '*', schema: 'public', table: 'images' },
           () => opts.onImageChange?.(),
         )
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' && !cleaned) {
+            console.warn('[Realtime] images-changes subscription error');
+          }
+        });
       channels.push(ch);
     }
 
@@ -50,7 +59,11 @@ export function useRealtime(opts: SubscribeOptions) {
           { event: '*', schema: 'public', table: 'clone_jobs' },
           (payload) => opts.onCloneJobChange?.(payload.new as CloneJob),
         )
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' && !cleaned) {
+            console.warn('[Realtime] clone-jobs-changes subscription error');
+          }
+        });
       channels.push(ch);
     }
 
@@ -62,11 +75,16 @@ export function useRealtime(opts: SubscribeOptions) {
           { event: 'INSERT', schema: 'public', table: 'activity' },
           (payload) => opts.onActivity?.(payload.new as Activity),
         )
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' && !cleaned) {
+            console.warn('[Realtime] activity-changes subscription error');
+          }
+        });
       channels.push(ch);
     }
 
     return () => {
+      cleaned = true;
       channels.forEach((c) => supabase.removeChannel(c));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

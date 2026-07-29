@@ -35,12 +35,13 @@ export function VideoPlayer({ videoId, videoSrc, poster }: Props) {
     const channelName = `video:${videoId}`;
 
     // ── Supabase Realtime Presence ───────────────────────────────────────────
+    let cleaned = false;
     const channel = supabase.channel(channelName, {
       config: { presence: { key: sessionId } },
     });
 
     channel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
+      if (status === 'SUBSCRIBED' && !cleaned) {
         await channel.track({ joined_at: Date.now() });
       }
     });
@@ -104,6 +105,7 @@ export function VideoPlayer({ videoId, videoSrc, poster }: Props) {
 
     // ── Cleanup ──────────────────────────────────────────────────────────────
     return () => {
+      cleaned = true;
       // Leave presence
       channel.untrack();
       supabase.removeChannel(channel);
