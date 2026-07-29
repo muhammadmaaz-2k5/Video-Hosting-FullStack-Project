@@ -68,6 +68,27 @@ BEGIN
       );
 
       RAISE NOTICE 'Created user % with id %', u.email, new_id;
+
+      -- GoTrue requires an identity record for email/password login
+      INSERT INTO auth.identities (
+        id,
+        user_id,
+        provider_id,
+        identity_data,
+        provider,
+        last_sign_in_at,
+        created_at,
+        updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        new_id,
+        new_id::text,
+        jsonb_build_object('sub', new_id::text, 'email', u.email),
+        'email',
+        now(),
+        now(),
+        now()
+      );
     ELSE
       RAISE NOTICE 'User % already exists (id %)', u.email, existing_id;
     END IF;
